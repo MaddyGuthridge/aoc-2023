@@ -73,7 +73,7 @@ fn mark_valid_numbers(cells: &Vec<Vec<Cell>>, valid: &mut Vec<Vec<bool>>) {
     }
 }
 
-fn calc_sum(cells: &Vec<Vec<Cell>>, valid: &Vec<Vec<bool>>) -> usize {
+fn calc_sum(cells: &[Vec<Cell>], valid: &[Vec<bool>]) -> usize {
     let mut sum = 0;
     for (r, row_data) in cells.iter().enumerate() {
         let mut curr_sum: Option<usize> = None;
