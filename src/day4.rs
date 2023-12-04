@@ -1,29 +1,23 @@
 use itertools::Itertools;
 
 fn parse_card(input: &str) -> usize {
-    let (_, numbers) = input.split_once(": ").unwrap();
-
-    let (winning, actual) = numbers.split_once(" | ").unwrap();
+    let (winning, actual) = input.split_once(": ").unwrap().1.split_once(" | ").unwrap();
 
     let winning_numbers = winning
         .split(' ')
         .filter_map(|n| n.trim().parse::<usize>().ok())
         .collect_vec();
 
-    let actual_numbers = actual
+    actual
         .split(' ')
         .filter_map(|n| n.trim().parse::<usize>().ok())
-        .collect_vec();
-
-    let mut count: usize = 0;
-
-    for num in actual_numbers {
-        if winning_numbers.contains(&num) {
-            count += 1;
-        }
-    }
-
-    count
+        .fold(0, |acc, curr| {
+            if winning_numbers.contains(&curr) {
+                acc + 1
+            } else {
+                acc
+            }
+        })
 }
 
 fn calc_card_score(count: usize) -> usize {
