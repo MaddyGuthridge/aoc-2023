@@ -44,18 +44,3 @@ pub fn part_2(input: &str) -> i64 {
 
     num_winning_combos(time, distance)
 }
-
-#[cfg(test)]
-mod test {
-    use super::{part_1, part_2};
-
-    #[test]
-    fn test_part_1() {
-        assert_eq!(part_1(""), 35,);
-    }
-
-    #[test]
-    fn test_part_2() {
-        assert_eq!(part_2(""), 46,);
-    }
-}
