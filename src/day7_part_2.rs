@@ -51,16 +51,13 @@ enum HandType {
     FiveOfAKind,
 }
 
-#[derive(Debug)]
-struct Hand([Card; 5]);
-
-impl Hand {
-    pub fn get_hand_type(&self) -> HandType {
+impl From<&Hand> for HandType {
+    fn from(value: &Hand) -> Self {
         let mut card_counts: HashMap<Card, u8> = HashMap::default();
 
         let mut num_jokers = 0;
 
-        for card in self.0 {
+        for card in value.0 {
             if let Card::J = card {
                 num_jokers += 1;
             }
@@ -142,6 +139,9 @@ impl Hand {
     }
 }
 
+#[derive(Debug)]
+struct Hand([Card; 5]);
+
 impl From<&str> for Hand {
     fn from(value: &str) -> Self {
         assert_eq!(value.len(), 5);
@@ -172,7 +172,7 @@ impl PartialOrd for Hand {
 
 impl Ord for Hand {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        match self.get_hand_type().cmp(&other.get_hand_type()) {
+        match HandType::from(self).cmp(&HandType::from(other)) {
             Ordering::Equal => self.0.cmp(&other.0),
             x => x,
         }
@@ -215,27 +215,27 @@ mod test {
 
     #[test]
     fn get_hand_type_five() {
-        assert_eq!(Hand::from("QJJJJ").get_hand_type(), HandType::FiveOfAKind);
-        assert_eq!(Hand::from("QQJJJ").get_hand_type(), HandType::FiveOfAKind);
-        assert_eq!(Hand::from("QQQJJ").get_hand_type(), HandType::FiveOfAKind);
-        assert_eq!(Hand::from("QQQQJ").get_hand_type(), HandType::FiveOfAKind);
+        assert_eq!(HandType::from(&Hand::from("QJJJJ")), HandType::FiveOfAKind);
+        assert_eq!(HandType::from(&Hand::from("QQJJJ")), HandType::FiveOfAKind);
+        assert_eq!(HandType::from(&Hand::from("QQQJJ")), HandType::FiveOfAKind);
+        assert_eq!(HandType::from(&Hand::from("QQQQJ")), HandType::FiveOfAKind);
     }
 
     #[test]
     fn get_hand_type_four() {
-        assert_eq!(Hand::from("QJJJA").get_hand_type(), HandType::FourOfAKind);
-        assert_eq!(Hand::from("QQJJA").get_hand_type(), HandType::FourOfAKind);
-        assert_eq!(Hand::from("QQQJA").get_hand_type(), HandType::FourOfAKind);
+        assert_eq!(HandType::from(&Hand::from("QJJJA")), HandType::FourOfAKind);
+        assert_eq!(HandType::from(&Hand::from("QQJJA")), HandType::FourOfAKind);
+        assert_eq!(HandType::from(&Hand::from("QQQJA")), HandType::FourOfAKind);
     }
 
     #[test]
     fn get_hand_type_full_house() {
-        assert_eq!(Hand::from("QQAAJ").get_hand_type(), HandType::FullHouse);
+        assert_eq!(HandType::from(&Hand::from("QQAAJ")), HandType::FullHouse);
     }
 
     #[test]
     fn get_hand_type_three() {
-        assert_eq!(Hand::from("QQJ32").get_hand_type(), HandType::ThreeOfAKind)
+        assert_eq!(HandType::from(&Hand::from("QQJ32")), HandType::ThreeOfAKind)
     }
 
     #[test]
