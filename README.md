@@ -9,6 +9,7 @@ I'm trying to solve all the problems as quickly as possible using Rust.
 ```txt
       --------Part 1--------   --------Part 2--------
 Day       Time   Rank  Score       Time   Rank  Score
+  8   00:15:41   4477      0   00:33:18   2045      0
   7   01:54:05  11328      0   02:59:43  11523      0  // Was busy
   6   00:30:57   9291      0   00:33:38   7942      0
   5   00:33:11   3573      0   01:27:57   2818      0
