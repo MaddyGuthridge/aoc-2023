@@ -28,9 +28,7 @@ fn extrapolate_value_backwards(values: Vec<i64>) -> i64 {
     if simplified_values.iter().sum::<i64>() == 0 {
         values[0]
     } else {
-        let extrapolate_value_backwards = extrapolate_value_backwards(simplified_values);
-        let var_name = values[0] - extrapolate_value_backwards;
-        var_name
+        values[0] - extrapolate_value_backwards(simplified_values)
     }
 }
 
@@ -46,7 +44,7 @@ pub fn part_2(input: &str) -> i64 {
 
 #[cfg(test)]
 mod test {
-    use crate::day9::{extrapolate_value, extrapolate_value_backwards};
+    use crate::day09::{extrapolate_value, extrapolate_value_backwards};
 
     #[test]
     fn test_extrapolate() {
