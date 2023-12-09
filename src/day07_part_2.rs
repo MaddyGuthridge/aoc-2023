@@ -197,7 +197,7 @@ pub fn part_2(input: &str) -> usize {
 
 #[cfg(test)]
 mod test {
-    use crate::day7_part_2::{part_2, Hand, HandType};
+    use crate::day07_part_2::{part_2, Hand, HandType};
 
     #[test]
     fn test_part_2() {

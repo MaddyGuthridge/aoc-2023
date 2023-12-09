@@ -202,7 +202,7 @@ pub fn part_2(input: &str) -> i64 {
 mod test {
     // use crate::day5::part_2;
 
-    use crate::day5::{part_1, part_2};
+    use crate::day05::{part_1, part_2};
 
     use super::{Range, RangeMap};
 

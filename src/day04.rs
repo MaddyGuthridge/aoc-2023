@@ -50,7 +50,7 @@ pub fn part_2(input: &str) -> usize {
 
 #[cfg(test)]
 mod test {
-    use crate::day4::part_2;
+    use crate::day04::part_2;
 
     #[test]
     fn test_part_2() {

@@ -184,7 +184,7 @@ pub fn part_2(input: &str) -> usize {
 
 #[cfg(test)]
 mod test {
-    use crate::day3::{calc_number, part_1, Cell, part_2};
+    use crate::day03::{calc_number, part_1, Cell, part_2};
 
     #[test]
     fn test_simple() {

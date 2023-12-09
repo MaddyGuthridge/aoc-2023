@@ -99,7 +99,7 @@ pub fn part_2(input: &str) -> i32 {
 
 #[cfg(test)]
 mod test {
-    use crate::day1::clean_up_line_part_2;
+    use crate::day01::clean_up_line_part_2;
 
     #[test]
     fn test_consume_strings() {

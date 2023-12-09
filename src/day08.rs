@@ -92,7 +92,7 @@ pub fn part_2(input: &str) -> i64 {
 
 #[cfg(test)]
 mod test {
-    use crate::day8::part_2;
+    use crate::day08::part_2;
 
     #[test]
     fn test_part_2() {

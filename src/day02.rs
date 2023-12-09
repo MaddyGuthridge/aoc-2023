@@ -88,7 +88,7 @@ pub fn part_2(input: &str) -> usize {
 
 #[cfg(test)]
 mod test {
-    use crate::day2::was_game_possible;
+    use crate::day02::was_game_possible;
 
     #[test]
     fn test_basic() {
