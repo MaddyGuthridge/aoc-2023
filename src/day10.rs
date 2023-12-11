@@ -189,19 +189,18 @@ pub fn part_2(input: &str) -> usize {
     let pipe_mask = create_pipe_mask(&grid, start_position);
 
     let mut num_contained = 0;
+    let mut in_loop = false;
 
-    for row in pipe_mask.rows_iter() {
-        let mut in_loop = false;
-        let mut touched_pipe_last = false;
-        for cell in row {
-            if *cell {
-                if !touched_pipe_last {
-                    in_loop = !in_loop;
-                }
-                touched_pipe_last = true;
-            } else if in_loop {
-                num_contained += 1;
+    for (position, value) in pipe_mask.enumerate_row_major() {
+        if *value {
+            // This is part of the main pipe
+            let pipe_part = &grid[position];
+            // Say if it connects to the north, we've entered/exited the loop
+            if pipe_part.connects_in_dir(NORTH) {
+                in_loop = !in_loop;
             }
+        } else if in_loop {
+            num_contained += 1;
         }
     }
     num_contained
