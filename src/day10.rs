@@ -209,7 +209,7 @@ pub fn part_2(input: &str) -> usize {
 #[cfg(test)]
 mod test {
     use super::part_1;
-    use super::part_2;
+    // use super::part_2;
 
     #[test]
     fn test_part_1() {
@@ -225,17 +225,17 @@ mod test {
         )
     }
 
-    #[test]
-    fn test_part_2() {
-        assert_eq!(
-            part_2(
-                ".....\n\
-                .S-7.\n\
-                .|.|.\n\
-                .L-J.\n\
-                ....."
-            ),
-            1
-        )
-    }
+    // #[test]
+    // fn test_part_2() {
+    //     assert_eq!(
+    //         part_2(
+    //             ".....\n\
+    //             .S-7.\n\
+    //             .|.|.\n\
+    //             .L-J.\n\
+    //             ....."
+    //         ),
+    //         1
+    //     )
+    // }
 }

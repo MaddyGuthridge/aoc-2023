@@ -16,4 +16,8 @@ pub mod day09;
 pub mod day10;
 pub mod day11;
 
+// TODO: Catch up
+
+pub mod day18;
+
 aoc_lib! { year = 2023 }
