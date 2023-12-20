@@ -717,9 +717,33 @@ pub fn part_2(input: &str) -> usize {
         + 1
 }
 
+pub fn part_2_brute_force(input: &str) -> usize {
+    let mut modules = set_up_modules(input);
+
+    let broadcaster_id = find_broadcaster_module(&modules);
+    let rx_id = find_with_name(&modules, "debug");
+
+    let mut event_queue = EventQueue::default();
+
+    let mut push_count = 0;
+
+    while modules[rx_id].counts.low == 0 {
+        event_queue.push(broadcaster_id, broadcaster_id, Pulse::Low);
+        event_queue.drain(&mut modules);
+        push_count += 1;
+        // if push_count % 1_000_000 == 0 {
+        //     dbg!(push_count);
+        // }
+    }
+
+    push_count
+}
+
+
+
 #[cfg(test)]
 mod test {
-    use super::{part_1, part_2};
+    use super::{part_1, part_2, part_2_brute_force};
 
     #[test]
     fn test_part_1_simple() {
@@ -750,6 +774,20 @@ mod test {
     }
 
     #[test]
+    fn test_part_2_brute_force() {
+        assert_eq!(
+            part_2_brute_force(
+                "broadcaster -> a\n\
+                %a -> inv, con\n\
+                &inv -> b\n\
+                %b -> con\n\
+                &con -> output"
+            ),
+            1
+        )
+    }
+
+    #[test]
     fn test_part_2() {
         assert_eq!(
             part_2(
@@ -760,6 +798,22 @@ mod test {
                 &con -> output"
             ),
             1
+        )
+    }
+
+    #[test]
+    fn test_part_2_loop() {
+        let input =
+            "broadcaster -> a\n\
+            %a -> b, con\n\
+            %b -> con\n\
+            %inv -> b\n\
+            &con -> inv, output";
+        let forced_value = part_2_brute_force(input);
+        assert_eq!(forced_value, 3);
+        assert_eq!(
+            part_2(input),
+            forced_value,
         )
     }
 }
