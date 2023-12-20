@@ -1,7 +1,27 @@
-use std::iter;
+use std::{collections::HashMap, fs, iter, ops::{Deref, DerefMut}, sync::RwLock};
 
 use itertools::Itertools;
 use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
+
+const RESULTS_FILE: &str = "../../../temp/day12.json";
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct SavedResults(HashMap<String, usize>);
+
+impl Deref for SavedResults {
+    type Target = HashMap<String, usize>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for SavedResults {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SpringState {
@@ -67,15 +87,18 @@ fn get_remaining_springs<'a>(
             }
             SpringState::Unknown => {
                 // No way to tell if it's safe from here on - assume yes
-                return Some((&mut springs[start_damaged_idx..], &damage_info[damage_idx..]));
+                return Some((
+                    &mut springs[start_damaged_idx..],
+                    &damage_info[damage_idx..],
+                ));
             }
         }
     }
 
     if let Some(expected) = damage_info.get(damage_idx) {
         if
-            // We've found the expected remaining amount of damage
-            *expected == found_damaged
+        // We've found the expected remaining amount of damage
+        *expected == found_damaged
             // And there are no remaining expected damage patches
             && damage_idx == damage_info.len() - 1
         {
@@ -135,6 +158,14 @@ pub fn part_1(input: &str) -> usize {
 
 #[aoc(day12, part2)]
 pub fn part_2(input: &str) -> usize {
+    // Load the saved results from a file
+    // This is helpful because I can't be bothered to optimise it, and want to
+    // be able to stop and start the processing
+    let saved_results: SavedResults =
+        serde_json::from_str(&fs::read_to_string(RESULTS_FILE).unwrap()).unwrap();
+
+    let saved_results_mut = RwLock::new(saved_results.clone());
+
     input
         .lines()
         .map(|line| line.split_once(' ').unwrap())
@@ -161,9 +192,33 @@ pub fn part_2(input: &str) -> usize {
         // I really can't be bothered to make it any faster
         .enumerate()
         .par_bridge()
-        .map(|(i, (mut springs, damages))| (i, count_matching_combos(&mut springs, &damages)))
+        .map(|(i, (mut springs, damages))| {
+            (
+                i,
+                // If it exists in the saved results
+                saved_results
+                    .get(&i.to_string())
+                    .copied()
+                    // Otherwise, calculate it
+                    .unwrap_or_else(|| {
+                        println!("Calculating {}...", i);
+                        count_matching_combos(&mut springs, &damages)
+                    }),
+            )
+        })
         .inspect(|(i, e)| {
-            println!("[{i}]\t{e}");
+            // Only if it hasn't been calculated before
+            if saved_results.get(&i.to_string()).is_none() {
+                // Print the result
+                println!("[{i}]\t{e}");
+
+                // Add it to the data
+                let mut results = saved_results_mut.write().unwrap();
+                results.insert(i.to_string(), *e);
+
+                // Then save the file
+                fs::write(RESULTS_FILE, serde_json::to_string(&results.0).unwrap()).unwrap();
+            }
         })
         .map(|(_, e)| e)
         .sum()
@@ -195,12 +250,7 @@ mod test {
 
     #[test]
     fn test_part_1_simple_2() {
-        assert_eq!(
-            part_1(
-                "????.######..#####. 1,6,5"
-            ),
-            4,
-        )
+        assert_eq!(part_1("????.######..#####. 1,6,5"), 4,)
     }
 
     #[test]
