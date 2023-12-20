@@ -2,14 +2,14 @@ use std::{
     collections::{HashMap, VecDeque},
     fmt::{Debug, Display},
     iter::Sum,
-    ops::{Add, AddAssign, Mul, Not}
+    ops::{Add, AddAssign, Mul, Not},
 };
 
 use itertools::Itertools;
 
 type ModuleId = usize;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Pulse {
     High,
     Low,
@@ -35,6 +35,9 @@ impl Display for Pulse {
         write!(f, "{disp}")
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+struct PulseAtTime(usize, Pulse);
 
 #[derive(Debug, Clone, Copy, Default)]
 struct PulseCounter {
@@ -134,7 +137,6 @@ impl EventQueue {
     }
 }
 
-
 trait ModuleTrait: Debug {
     /// Receive a pulse from another node
     fn receive_pulse(&mut self, input: ModuleId, pulse: Pulse, event_queue: &mut EventQueue);
@@ -148,18 +150,57 @@ trait ModuleTrait: Debug {
     fn is_in_initial_state(&self) -> bool;
 
     /// Register an input module for this module
-    fn register_input_module(&mut self, _module: ModuleId) {}
+    fn register_input_module(&mut self, module: ModuleId);
+
+    /// Return the number of button presses for this to pulse in the given
+    /// state.
+    ///
+    /// Returns a tuple containing a vec of times and pulses, and a usize to represent the
+    /// period of the cycle
+    ///
+    /// For example, if a module gives a low pulse every third button press, this
+    /// would return `(vec![(2, Pulse::Low)], 3)`, representing a period of 3,
+    /// for which, it triggers a low pulse on press 3 (index 2) each repetition
+    fn get_presses_required_for_pulse(
+        &self,
+        other_modules: &[Module],
+        visited_stack: &mut VecDeque<String>,
+    ) -> (Vec<PulseAtTime>, usize);
+}
+
+/// Merge a vec of periods into a single period that contains all the pulses
+fn merge_periods(periods: Vec<(Vec<PulseAtTime>, usize)>) -> (Vec<PulseAtTime>, usize) {
+    // Calculate the total period
+    let full_period = periods
+        .iter()
+        .map(|(_, p)| *p)
+        .reduce(num::integer::lcm)
+        .unwrap();
+
+    // Now for each input, extend its pulses to be the length of the
+    // full period, then flatten them all into one sorted array
+    let full_period_data = periods
+        .into_iter()
+        .flat_map(|(pulses, period)| pulses.repeat(full_period / period))
+        .sorted()
+        .collect_vec();
+    (full_period_data, full_period)
 }
 
 #[derive(Debug, Clone)]
 struct Broadcaster {
     id: ModuleId,
     outputs: Vec<ModuleId>,
+    inputs: Vec<ModuleId>,
 }
 
 impl Broadcaster {
     fn new(id: ModuleId, outputs: Vec<ModuleId>) -> Self {
-        Broadcaster { id, outputs }
+        Broadcaster {
+            id,
+            outputs,
+            inputs: vec![],
+        }
     }
 }
 
@@ -177,6 +218,33 @@ impl ModuleTrait for Broadcaster {
     fn get_outputs(&self) -> &[ModuleId] {
         &self.outputs
     }
+
+    fn register_input_module(&mut self, module: ModuleId) {
+        self.inputs.push(module);
+    }
+
+    fn get_presses_required_for_pulse(
+        &self,
+        other_modules: &[Module],
+        visited_stack: &mut VecDeque<String>,
+    ) -> (Vec<PulseAtTime>, usize) {
+        if self.inputs.is_empty() {
+            (vec![PulseAtTime(0, Pulse::Low)], 1)
+        } else {
+            // Determine pulse times and periods of all parents
+            // This may end up with a lot - I'm hoping that with only 58
+            // modules in the input, it shouldn't cause too much chaos at least
+            let input_data = self
+                .inputs
+                .iter()
+                .map(|i| {
+                    other_modules[*i].get_presses_required_for_pulse(other_modules, visited_stack)
+                })
+                .collect_vec();
+
+            merge_periods(input_data)
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -184,6 +252,7 @@ struct FlipFlop {
     id: ModuleId,
     state: Pulse,
     outputs: Vec<ModuleId>,
+    inputs: Vec<ModuleId>,
 }
 
 impl FlipFlop {
@@ -192,6 +261,7 @@ impl FlipFlop {
             id,
             state: Pulse::Low,
             outputs,
+            inputs: vec![],
         }
     }
 }
@@ -213,11 +283,62 @@ impl ModuleTrait for FlipFlop {
     fn get_outputs(&self) -> &[ModuleId] {
         &self.outputs
     }
+
+    fn get_presses_required_for_pulse(
+        &self,
+        other_modules: &[Module],
+        visited_stack: &mut VecDeque<String>,
+    ) -> (Vec<PulseAtTime>, usize) {
+        // Determine pulse times and periods of all parents
+        let (mut pulses, period) = merge_periods(
+            self.inputs
+                .iter()
+                .map(|i| {
+                    let (pulses, period) = other_modules[*i]
+                        .get_presses_required_for_pulse(other_modules, visited_stack);
+
+                    (
+                        pulses
+                            .into_iter()
+                            // We only pulse when receiving a low pulse
+                            .filter(|p| p.1 == Pulse::Low)
+                            .collect_vec(),
+                        period,
+                    )
+                })
+                .collect_vec(),
+        );
+
+        // If there are an odd number of elements, the second repetition will
+        // have different pulse types to the first, so we need to repeat it
+        if pulses.len() % 2 == 1 {
+            pulses = pulses.repeat(2);
+        }
+
+        // Each pulse triggers the opposite pulse kind to the last
+        let mut curr_pulse = Pulse::High;
+        pulses = pulses
+            .into_iter()
+            .map(|mut p| {
+                p.1 = curr_pulse;
+                // Swap pulse kind
+                curr_pulse = !curr_pulse;
+                p
+            })
+            .collect_vec();
+
+        (pulses, period)
+    }
+
+    fn register_input_module(&mut self, module: ModuleId) {
+        self.inputs.push(module);
+    }
 }
 
 #[derive(Debug, Clone)]
 struct Conjunction {
     id: ModuleId,
+    inputs: Vec<ModuleId>,
     outputs: Vec<ModuleId>,
     /// Each index corresponds with an input module
     memory: Vec<Option<Pulse>>,
@@ -229,6 +350,7 @@ impl Conjunction {
     fn new(id: ModuleId, outputs: Vec<ModuleId>, num_modules: usize) -> Self {
         Conjunction {
             id,
+            inputs: vec![],
             outputs,
             memory: vec![None; num_modules],
             num_high: 0,
@@ -276,10 +398,69 @@ impl ModuleTrait for Conjunction {
         assert!(self.memory[module].is_none());
         self.total_registered += 1;
         self.memory[module] = Some(Pulse::Low);
+        self.inputs.push(module);
     }
 
     fn get_outputs(&self) -> &[ModuleId] {
         &self.outputs
+    }
+
+    fn get_presses_required_for_pulse(
+        &self,
+        other_modules: &[Module],
+        visited_stack: &mut VecDeque<String>,
+    ) -> (Vec<PulseAtTime>, usize) {
+        // This will probably be the least efficient one.... it is kinda
+        // complex
+        let periods = self
+            .inputs
+            .iter()
+            .map(|i| other_modules[*i].get_presses_required_for_pulse(other_modules, visited_stack))
+            .collect_vec();
+
+        let mut memory = vec![Pulse::Low; periods.len()];
+
+        // Calculate the total period
+        let full_period = periods
+            .iter()
+            .map(|(_, p)| *p)
+            .reduce(num::integer::lcm)
+            .unwrap();
+
+        // Now for each input, extend its pulses to be the length of the
+        // full period, then flatten them all into one sorted array
+        let full_period_data = periods
+            .into_iter()
+            // Keep the index associated with it so that we can use it with the memory
+            .enumerate()
+            .flat_map(|(i, (pulses, period))| {
+                pulses
+                    .into_iter()
+                    .map(|p| (p, i))
+                    .collect_vec()
+                    // Repeat it to make it last for the full period
+                    .repeat(full_period / period)
+            })
+            .sorted()
+            .collect_vec();
+
+        // Now go through the full period data, and for each element check if
+        // it would trigger a low pulse
+        let mut output_period_data = vec![];
+
+        for (pulse, i) in full_period_data {
+            memory[i] = pulse.1;
+            if memory.contains(&Pulse::Low) {
+                // Contains a low pulse, give a high pulse
+                output_period_data.push(PulseAtTime(pulse.0, Pulse::High));
+            } else {
+                // All high pulses, give a low pulse
+                output_period_data.push(PulseAtTime(pulse.0, Pulse::Low));
+            }
+        }
+
+        // Now return the data
+        (output_period_data, full_period)
     }
 }
 
@@ -388,18 +569,44 @@ impl ModuleTrait for Module {
             ModuleVariant::Conjunction(v) => v.get_outputs(),
         }
     }
+
+    fn get_presses_required_for_pulse(
+        &self,
+        other_modules: &[Module],
+        visited_stack: &mut VecDeque<String>,
+    ) -> (Vec<PulseAtTime>, usize) {
+        dbg!(&self.name);
+
+        // Track which modules we've visited to try to find out why I'm getting
+        // a stack overflow :/
+        if visited_stack.contains(&self.name) {
+            panic!("Already visited module {:?}!!! Stack is {visited_stack:?}", self.name);
+        }
+        visited_stack.push_back(self.name.clone());
+
+        let ret = match &self.variant {
+            ModuleVariant::Broadcaster(v) => {
+                v.get_presses_required_for_pulse(other_modules, visited_stack)
+            }
+            ModuleVariant::FlipFlop(v) => {
+                v.get_presses_required_for_pulse(other_modules, visited_stack)
+            }
+            ModuleVariant::Conjunction(v) => {
+                v.get_presses_required_for_pulse(other_modules, visited_stack)
+            }
+        };
+
+        visited_stack.pop_back();
+
+        ret
+    }
 }
 
 fn make_mod_names_map(names: &str) -> HashMap<String, ModuleId> {
     names
         .lines()
         .enumerate()
-        .map(|(i, line)| {
-            (
-                extract_module_name_from_line(line),
-                i,
-            )
-        })
+        .map(|(i, line)| (extract_module_name_from_line(line), i))
         .collect()
 }
 
@@ -446,11 +653,7 @@ fn find_broadcaster_module(modules: &[Module]) -> ModuleId {
 }
 
 fn find_with_name(modules: &[Module], name: &str) -> ModuleId {
-    modules
-        .iter()
-        .find_position(|m| m.name == name)
-        .unwrap()
-        .0
+    modules.iter().find_position(|m| m.name == name).unwrap().0
 }
 
 #[aoc(day20, part1)]
@@ -493,25 +696,25 @@ pub fn part_1(input: &str) -> usize {
 
 #[aoc(day20, part2)]
 pub fn part_2(input: &str) -> usize {
-    let mut modules = set_up_modules(input);
-
-    let broadcaster_id = find_broadcaster_module(&modules);
+    // unsafe {
+    //     backtrace_on_stack_overflow::enable();
+    // }
+    let modules = set_up_modules(input);
     let rx_id = find_with_name(&modules, "debug");
 
-    let mut event_queue = EventQueue::default();
-
-    let mut push_count = 0;
-
-    while modules[rx_id].counts.low == 0 {
-        event_queue.push(broadcaster_id, broadcaster_id, Pulse::Low);
-        event_queue.drain(&mut modules);
-        push_count += 1;
-        if push_count % 1_000_000 == 0 {
-            dbg!(push_count);
-        }
-    }
-
-    push_count
+    modules[rx_id]
+        .get_presses_required_for_pulse(&modules, &mut VecDeque::default())
+        // Discard the full duration, since it will happen somewhere in the
+        // period
+        .0
+        .into_iter()
+        // Find the first low pulse
+        .find(|p| p.1 == Pulse::Low)
+        .unwrap()
+        // Grab the button press that it happens at
+        // and add 1, since we started time at zero
+        .0
+        + 1
 }
 
 #[cfg(test)]
@@ -548,6 +751,15 @@ mod test {
 
     #[test]
     fn test_part_2() {
-        assert_eq!(part_2(""), 0)
+        assert_eq!(
+            part_2(
+                "broadcaster -> a\n\
+                %a -> inv, con\n\
+                &inv -> b\n\
+                %b -> con\n\
+                &con -> output"
+            ),
+            1
+        )
     }
 }
