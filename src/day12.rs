@@ -29,109 +29,98 @@ fn load_spring_states(info: &str) -> Vec<SpringState> {
     info.chars().map_into().collect_vec()
 }
 
-fn is_state_valid(springs: &[SpringState], damage_info: &[usize]) -> bool {
-    let mut damage_iter = damage_info.iter();
-    let mut expected_damaged = damage_iter.next();
-    let mut found_damaged = 0usize;
-    for spring in springs {
+/// Returns the remaining slices of the springs and damage info
+/// This allows us to skip over checking the starting parts, which we know are
+/// correct (since we already checked them earlier in the recursion)
+fn get_remaining_springs<'a>(
+    springs: &'a mut [SpringState],
+    damage_info: &'a [usize],
+) -> Option<(&'a mut [SpringState], &'a [usize])> {
+    // Current index of damaged spring
+    let mut damage_idx = 0;
+    let mut start_damaged_idx = 0;
+    let mut found_damaged = 0;
+
+    for (springs_idx, spring) in springs.iter().enumerate() {
+        let expected_damaged = damage_info.get(damage_idx);
         match spring {
             SpringState::Safe => {
                 // If we found some damaged ones
                 if found_damaged != 0 {
                     // It must be equal to the expected amount
                     if Some(&found_damaged) != expected_damaged {
-                        return false;
+                        return None;
                     }
-                    expected_damaged = damage_iter.next();
+                    damage_idx += 1;
                 }
+                start_damaged_idx = springs_idx;
                 found_damaged = 0;
             }
             SpringState::Damaged => {
+                if found_damaged == 0 {
+                    start_damaged_idx = springs_idx;
+                }
                 found_damaged += 1;
                 if !expected_damaged.is_some_and(|exp| &found_damaged <= exp) {
-                    return false;
+                    return None;
                 }
             }
             SpringState::Unknown => {
                 // No way to tell if it's safe from here on - assume yes
-                return true;
+                return Some((&mut springs[start_damaged_idx..], &damage_info[damage_idx..]));
             }
         }
     }
 
-    if let Some(expected) = expected_damaged {
-        // We've found the expected remaining amount of damage
-        *expected == found_damaged
-        // And there are no remaining expected damage patches
-        && damage_iter.count() == 0
+    if let Some(expected) = damage_info.get(damage_idx) {
+        if
+            // We've found the expected remaining amount of damage
+            *expected == found_damaged
+            // And there are no remaining expected damage patches
+            && damage_idx == damage_info.len() - 1
+        {
+            Some((&mut [], &[]))
+        } else {
+            None
+        }
+    } else if found_damaged == 0 {
+        Some((&mut [], &[]))
     } else {
-        found_damaged == 0
+        None
     }
 }
 
-fn find_unknowns(springs: &[SpringState]) -> Vec<usize> {
+/// Returns the index of the next unknown spring state in the slice
+fn find_unknown(springs: &[SpringState]) -> usize {
     springs
         .iter()
-        .enumerate()
-        .filter(|(_, s)| *s == &SpringState::Unknown)
-        .map(|(i, _)| i)
-        .collect_vec()
+        .find_position(|s| *s == &SpringState::Unknown)
+        .unwrap()
+        .0
 }
 
-// This is much simpler as a recursive function but is also far slower
-// As such, I've written it to use a while loop instead
+/// Count the number of combinations of spring states that match the given
+/// damage info slice
 fn count_matching_combos(springs: &mut [SpringState], damage_info: &[usize]) -> usize {
-    let unknowns = find_unknowns(springs);
+    if let Some((springs, damage_info)) = get_remaining_springs(springs, damage_info) {
+        if springs.is_empty() {
+            1
+        } else {
+            let unknown_position = find_unknown(springs);
 
-    let mut num_valid_combinations = 0;
-    let mut unknown_index: i32 = 0;
-
-    while unknown_index >= 0 {
-        // If there are no more unknowns
-        if unknown_index as usize == unknowns.len() {
-            // It's complete, add 1 if it's valid
-            if is_state_valid(springs, damage_info) {
-                num_valid_combinations += 1;
+            // Try all combinations
+            let mut count = 0;
+            for state in [SpringState::Damaged, SpringState::Safe] {
+                springs[unknown_position] = state;
+                count += count_matching_combos(springs, damage_info);
             }
-            unknown_index -= 1;
-            continue;
+            // And reset it back to unknown for the next iteration
+            springs[unknown_position] = SpringState::Unknown;
+            count
         }
-        let index = unknowns[unknown_index as usize];
-        // If this position is unknown, we haven't checked it yet
-        match springs[index] {
-            SpringState::Unknown => {
-                // First try making it damaged
-                springs[index] = SpringState::Damaged;
-                // If this gives a valid state, try later combinations
-                if is_state_valid(springs, damage_info) {
-                    unknown_index += 1;
-                } else {
-                    // Otherwise, we'll try making it safe on the next iteration
-                }
-            },
-            SpringState::Damaged => {
-                // It's currently damaged, so let's now make it safe
-                springs[index] = SpringState::Safe;
-                // If this gives a valid state, try later combinations
-                if is_state_valid(springs, damage_info) {
-                    unknown_index += 1;
-                } else {
-                    // Otherwise, we'll try modifying an earlier one on the
-                    // next iteration
-                    springs[index] = SpringState::Unknown;
-                    unknown_index -= 1;
-                }
-            },
-            SpringState::Safe => {
-                // We've tried all combinations from this branch, let's try
-                // modifying an earlier one instead
-                springs[index] = SpringState::Unknown;
-                unknown_index -= 1;
-            },
-        }
+    } else {
+        0
     }
-
-    num_valid_combinations
 }
 
 #[aoc(day12, part1)]
@@ -182,19 +171,7 @@ pub fn part_2(input: &str) -> usize {
 
 #[cfg(test)]
 mod test {
-    use super::{is_state_valid, part_1, part_2, SpringState};
-
-    #[test]
-    fn test_is_state_valid() {
-        assert!(is_state_valid(
-            &[
-                SpringState::Damaged,
-                SpringState::Safe,
-                SpringState::Damaged,
-            ],
-            &[1, 1,],
-        ))
-    }
+    use super::{part_1, part_2};
 
     #[test]
     fn test_part_1() {
@@ -214,6 +191,16 @@ mod test {
     #[test]
     fn test_part_1_simple() {
         assert_eq!(part_1("?###????? 3,2,1"), 1,)
+    }
+
+    #[test]
+    fn test_part_1_simple_2() {
+        assert_eq!(
+            part_1(
+                "????.######..#####. 1,6,5"
+            ),
+            4,
+        )
     }
 
     #[test]
