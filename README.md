@@ -26,4 +26,4 @@ I'm trying to solve all the problems by writing my own algorithms in Rust.
 * 18 ✅✅
 * 19 ✅✅
 * 20 ✅
-* 21 ✅
+* 21 ✅✅ (I am very proud of this solution)
