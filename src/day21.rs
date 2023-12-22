@@ -319,7 +319,8 @@ impl InfiniteWorld {
     ///     +--+
     fn steps_remaining_at_chunk(&self, num_steps: usize, (row, col): (i32, i32)) -> i32 {
         // Number of full chunks covered (excluding starting chunk)
-        let chunks_covered = row.abs() + col.abs() - 2;
+        let chunks_covered =
+            row.abs() + col.abs() - (if row == 0 { 0 } else { 1 } + if col == 0 { 0 } else { 1 });
 
         // Steps required to leave the starting chunk
         let steps_from_starting_chunk = (if row == 0 { 0 } else { self.chunk_size / 2 + 1 })
@@ -346,7 +347,9 @@ fn num_positions_after_steps(input: &str, num_steps: usize) -> usize {
         // approach
         let chunk = Chunk::parse(input);
         let start = chunk.start_index();
-        return chunk.fill(start).num_tiles_visitable_at_depth(num_steps as i32);
+        return chunk
+            .fill(start)
+            .num_tiles_visitable_at_depth(num_steps as i32);
     }
 
     // Create a diamond of fully explored chunks
@@ -362,8 +365,8 @@ fn num_positions_after_steps(input: &str, num_steps: usize) -> usize {
     // Note that although I'm calling these "odd" and "even", they may be the
     // other way around depending on the number of steps - as long as they
     // match up with `world.num_even` and `world.num_odd` it'll add up fine
-    let num_even_chunks = (0..(explored_width - 1)).sum::<usize>() + explored_width - 1;
-    let num_odd_chunks = (1..explored_width).sum::<usize>() + explored_width;
+    let num_odd_chunks = (0..(explored_width)).sum::<usize>() * 2 + explored_width;
+    let num_even_chunks = (1..=(explored_width)).sum::<usize>() * 2 + explored_width + 1;
 
     // The sum of all chunks so far
     let mut sum = world.num_even * num_even_chunks + world.num_odd * num_odd_chunks;
@@ -417,6 +420,15 @@ mod test {
 
     fn num_positions_with_simple_input(num_steps: usize) -> usize {
         num_positions_after_steps(
+            "...\n\
+             .S.\n\
+             ...",
+            num_steps,
+        )
+    }
+
+    fn num_positions_with_complex_input(num_steps: usize) -> usize {
+        num_positions_after_steps(
             ".....\n\
              .#.#.\n\
              ..S..\n\
@@ -428,12 +440,11 @@ mod test {
 
     #[test]
     fn test_part_2_simple() {
-        assert_eq!(num_positions_with_simple_input(2), 5);
+        assert_eq!(num_positions_with_complex_input(2), 5);
     }
 
     #[test]
     fn test_part_2_wrap_next_cell() {
-        // FIXME: The expected value is wrong, but so is the implementation determining it as such
-        assert_eq!(num_positions_with_simple_input(5), 17);
+        assert_eq!(num_positions_with_simple_input(7), 64);
     }
 }
