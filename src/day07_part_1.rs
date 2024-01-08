@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, collections::HashMap};
+use std::cmp::Ordering;
 
 use itertools::Itertools;
 
@@ -54,48 +54,69 @@ enum HandType {
 #[derive(Debug)]
 struct Hand([Card; 5]);
 
-impl Hand {
-    fn get_hand_type(&self) -> HandType {
-        let mut card_counts: HashMap<Card, u8> = HashMap::default();
+// impl Hand {
+//     fn get_hand_type(&self) -> HandType {
+//         let mut card_counts: HashMap<Card, u8> = HashMap::default();
+//
+//         for card in self.0 {
+//             card_counts.insert(card, card_counts.get(&card).unwrap_or(&0) + 1);
+//         }
+//
+//         let mut num_pairs = 0;
+//         let mut num_triples = 0;
+//
+//         for count in card_counts.values() {
+//             match count {
+//                 2 => {
+//                     num_pairs += 1;
+//                 }
+//                 3 => {
+//                     num_triples += 1;
+//                 }
+//                 4 => {
+//                     return HandType::FourOfAKind;
+//                 }
+//                 5 => {
+//                     return HandType::FiveOfAKind;
+//                 }
+//                 _ => {}
+//             }
+//         }
+//
+//         if num_pairs == 2 {
+//             HandType::TwoPair
+//         } else if num_pairs == 1 {
+//             if num_triples == 1 {
+//                 HandType::FullHouse
+//             } else {
+//                 HandType::OnePair
+//             }
+//         } else if num_triples == 1 {
+//             HandType::ThreeOfAKind
+//         } else {
+//             HandType::HighCard
+//         }
+//     }
+// }
 
-        for card in self.0 {
-            card_counts.insert(card, card_counts.get(&card).unwrap_or(&0) + 1);
-        }
-
-        let mut num_pairs = 0;
-        let mut num_triples = 0;
-
-        for count in card_counts.values() {
-            match count {
-                2 => {
-                    num_pairs += 1;
-                }
-                3 => {
-                    num_triples += 1;
-                }
-                4 => {
-                    return HandType::FourOfAKind;
-                }
-                5 => {
-                    return HandType::FiveOfAKind;
-                }
-                _ => {}
+impl From<&Hand> for HandType {
+    fn from(value: &Hand) -> Self {
+        match value.0.iter()
+            .sorted()
+            .group_by(|v| *v)
+            .into_iter()
+            .map(|(_, v)| v.count())
+            .sorted()
+            .collect_vec()[..] {
+                [5] => HandType::FiveOfAKind,
+                [1, 4] => HandType::FourOfAKind,
+                [2, 3] => HandType::FullHouse,
+                [1, 1, 3] => HandType::ThreeOfAKind,
+                [1, 2, 2] => HandType::TwoPair,
+                [1, 1, 1, 2] => HandType::OnePair,
+                [1, 1, 1, 1, 1] => HandType::HighCard,
+                _ => panic!()
             }
-        }
-
-        if num_pairs == 2 {
-            HandType::TwoPair
-        } else if num_pairs == 1 {
-            if num_triples == 1 {
-                HandType::FullHouse
-            } else {
-                HandType::OnePair
-            }
-        } else if num_triples == 1 {
-            HandType::ThreeOfAKind
-        } else {
-            HandType::HighCard
-        }
     }
 }
 
@@ -129,7 +150,7 @@ impl PartialOrd for Hand {
 
 impl Ord for Hand {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        match self.get_hand_type().cmp(&other.get_hand_type()) {
+        match HandType::from(self).cmp(&HandType::from(other)) {
             Ordering::Equal => self.0.cmp(&other.0),
             x => x,
         }
