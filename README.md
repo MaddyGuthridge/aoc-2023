@@ -1,6 +1,4 @@
-# AOC2023
-
-Advent of Code 2023
+# Advent of Code 2023
 
 I'm trying to solve all the problems by writing my own algorithms in Rust.
 
